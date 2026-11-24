@@ -11,7 +11,10 @@ from notify_flow.db.session import make_engine, make_sessionmaker
 TEST_DB = os.environ.get(
     "NF_TEST_DATABASE_URL", "postgresql+asyncpg://postgres@localhost:5433/notify_flow_test"
 )
-TABLES = "provider_deliveries, notifications, processed_events, outbox, inbound_events, members"
+TABLES = (
+    "provider_deliveries, notifications, notification_reservations, processed_events, "
+    "outbox, inbound_events, members"
+)
 
 
 @pytest.fixture(scope="session")

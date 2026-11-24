@@ -1,15 +1,15 @@
 """Shared notification domain operations used by Temporal activities and AWS Lambda."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from notify_flow.channel.policy import CHANNELS, ChannelPolicy, MemberFeatures
 from notify_flow.config import Settings
-from notify_flow.db.models import Member, Notification
+from notify_flow.db.models import Member, Notification, NotificationReservation
 from notify_flow.llm.personalize import Personalizer
 from notify_flow.log import correlation_id, get_logger
 from notify_flow.metrics import (
@@ -58,14 +58,36 @@ class NotificationService:
 
     async def plan(self, inp: NotificationInput) -> Plan:
         correlation_id.set(inp.correlation_id)
-        async with self.sm() as session:
-            member = await session.get(Member, inp.member_id)
-        if member is None:
-            log.warning("plan.unknown_member", event_id=inp.event_id)
-            return Plan(skip=True, reason="unknown_member")
-        eligible = _eligible(member)
-        if not eligible:
-            return Plan(skip=True, reason="no_eligible_channel")
+        async with self.sm.begin() as session:
+            member = (
+                await session.execute(
+                    select(Member).where(Member.id == inp.member_id).with_for_update()
+                )
+            ).scalar_one_or_none()
+            if member is None:
+                log.warning("plan.unknown_member", event_id=inp.event_id)
+                return Plan(skip=True, reason="unknown_member")
+            eligible = _eligible(member)
+            if not eligible:
+                return Plan(skip=True, reason="no_eligible_channel")
+            reservation = await session.get(NotificationReservation, inp.event_id)
+            cap = self.settings.member_frequency_cap_24h
+            if cap > 0 and reservation is None:
+                cutoff = datetime.now(UTC) - timedelta(hours=24)
+                used = (
+                    await session.execute(
+                        select(func.count())
+                        .select_from(NotificationReservation)
+                        .where(
+                            NotificationReservation.member_id == inp.member_id,
+                            NotificationReservation.reserved_at >= cutoff,
+                        )
+                    )
+                ).scalar_one()
+                if used >= cap:
+                    log.info("plan.frequency_capped", event_id=inp.event_id, cap=cap)
+                    return Plan(skip=True, reason="frequency_cap")
+                session.add(NotificationReservation(event_id=inp.event_id, member_id=inp.member_id))
         local_hour = datetime.now(UTC).astimezone(ZoneInfo(member.timezone)).hour
         features = MemberFeatures(
             member.program_week,

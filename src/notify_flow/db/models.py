@@ -95,6 +95,18 @@ class ProcessedEvent(Base):
     )
 
 
+class NotificationReservation(Base):
+    """Atomic, cross-campaign admission record for the rolling member frequency cap."""
+
+    __tablename__ = "notification_reservations"
+
+    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    member_id: Mapped[str] = mapped_column(String(64), index=True)
+    reserved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
 class Notification(Base):
     """One row per (event, step). idempotency_key is unique, which is what makes a send
     happen at most once no matter how many times the activity runs."""

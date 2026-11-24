@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     quiet_hours_start: int = 21  # local hour, inclusive
     quiet_hours_end: int = 8  # local hour, exclusive
     quiet_hours_enabled: bool = True
+    member_frequency_cap_24h: int = 10  # distinct notification events; 0 disables
 
     metrics_port: int = 9101
 

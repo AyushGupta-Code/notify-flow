@@ -16,3 +16,9 @@
 - Added automatic fallback to the plan's next eligible channel when a provider reports a
   definitive pre-send outage. Ambiguous post-send failures continue retrying the original
   idempotency key, preventing failover from creating duplicate deliveries.
+
+### Member frequency caps
+
+- Added atomic, durable rolling-24-hour reservations across campaigns. The default admits
+  ten distinct notification events per member; duplicate planning is idempotent and
+  concurrent workflows serialize on the member row.

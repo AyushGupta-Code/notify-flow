@@ -230,3 +230,13 @@ async def test_unknown_member_is_skipped(env, sm, make_worker):
         _, result = await run_event(env, sm, msg(member_id="ghost"))
     assert result == {"status": "skipped", "reason": "unknown_member"}
     assert await count(sm, ProcessedEvent) == 1
+
+
+async def test_frequency_cap_is_shared_across_campaigns(env, sm, make_worker):
+    await add_member(sm)
+    w, _ = make_worker(settings(member_frequency_cap_24h=1))
+    async with w:
+        _, first = await run_event(env, sm, msg("session_missed"))
+        _, second = await run_event(env, sm, msg("pain_score_reported", score=7))
+    assert first["status"] == "completed"
+    assert second == {"status": "skipped", "reason": "frequency_cap"}
