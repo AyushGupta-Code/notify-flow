@@ -13,11 +13,12 @@ groups:
           runbook: "docs/RUNBOOK.md#llm-fallback-rate-high"
 
       - alert: NotifyFlowLLMCircuitOpen
-        expr: max(nf_llm_circuit_state) == 2
+        # >= 1: open or half-open. Using == 2 would let a half-open scrape reset the timer.
+        expr: max(nf_llm_circuit_state) >= 1
         for: 2m
         labels: {severity: warning, team: proactive-comms}
         annotations:
-          summary: "LLM circuit breaker is open on at least one worker"
+          summary: "LLM circuit breaker is open (or half-open) on at least one worker"
           runbook: "docs/RUNBOOK.md#llm-circuit-open"
 
       - alert: NotifyFlowConsumerLagHigh

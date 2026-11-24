@@ -1,0 +1,19 @@
+{
+  "events": 500,
+  "posts_including_duplicates": 550,
+  "concurrency": 20,
+  "api_statuses": {
+    "accepted": 500,
+    "duplicate": 50
+  },
+  "ingest_seconds": 2.95,
+  "ingest_posts_per_s": 186.3,
+  "api_latency_ms_p50": 78.4,
+  "api_latency_ms_p95": 252.2,
+  "step1_sent": 500,
+  "seconds_until_all_step1_sent": 135.19,
+  "end_to_end_events_per_s": 3.7,
+  "event_to_send_s_p50": 83.43,
+  "event_to_send_s_p95": 128.1,
+  "step1_vendor_deliveries": 500
+}

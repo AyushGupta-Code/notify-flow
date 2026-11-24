@@ -10,7 +10,7 @@ tests:
       - series: 'nf_copy_generated_total{source="llm",reason="ok"}'
         values: '0+5x15'
       - series: 'nf_llm_circuit_state{instance="worker-1"}'
-        values: '0 0 2 2 2 2 2 2 2 2 2 2 2 2 2 2'
+        values: '0 0 2 2 1 2 2 2 2 2 2 2 2 2 2 2'  # a half-open scrape must not reset 'for'
     alert_rule_test:
       - eval_time: 12m
         alertname: NotifyFlowLLMFallbackRateHigh
@@ -25,7 +25,7 @@ tests:
         exp_alerts:
           - exp_labels: {severity: warning, team: proactive-comms}
             exp_annotations:
-              summary: "LLM circuit breaker is open on at least one worker"
+              summary: "LLM circuit breaker is open (or half-open) on at least one worker"
               runbook: "docs/RUNBOOK.md#llm-circuit-open"
 
   - name: policy-only templates do not count as fallback

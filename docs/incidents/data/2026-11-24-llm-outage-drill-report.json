@@ -1,0 +1,92 @@
+{
+  "drill": {
+    "run": "da50db",
+    "rate_per_s": 4.0,
+    "phases_s": {
+      "outage_start": 60.0,
+      "outage_end": 240.0,
+      "end": 331.3
+    },
+    "events_accepted": 1277,
+    "post_errors": 0,
+    "planned_duration_s": 330
+  },
+  "metrics_by_phase": {
+    "baseline": {
+      "seconds": 60.0,
+      "copy_by_source_reason": {
+        "llm:ok": 385
+      },
+      "llm_outcomes": {
+        "ok": 385
+      },
+      "fallback_ratio": 0.0,
+      "sends": 385,
+      "send_failures": 0,
+      "avg_compose_llm_latency_s": 0.153
+    },
+    "outage": {
+      "seconds": 180.0,
+      "copy_by_source_reason": {
+        "template:circuit_open": 1400
+      },
+      "llm_outcomes": {
+        "circuit_open": 1400
+      },
+      "fallback_ratio": 1.0,
+      "sends": 1399,
+      "send_failures": 0,
+      "avg_compose_llm_latency_s": 0.003
+    },
+    "recovery": {
+      "seconds": 91.3,
+      "copy_by_source_reason": {
+        "llm:ok": 681
+      },
+      "llm_outcomes": {
+        "ok": 681
+      },
+      "fallback_ratio": 0.0,
+      "sends": 682,
+      "send_failures": 0,
+      "avg_compose_llm_latency_s": 0.153
+    }
+  },
+  "circuit": {
+    "first_seen_open_s_after_kill": 2.2,
+    "seconds_open_or_half_open": 180,
+    "first_seen_closed_s_after_restore": 2.9
+  },
+  "db_by_phase": {
+    "baseline": {
+      "events": 232,
+      "step1_sent": 232,
+      "step1_by_copy_source": {
+        "llm": 232,
+        "template": 0
+      },
+      "event_to_send_s_p50": 0.39,
+      "event_to_send_s_p95": 0.49
+    },
+    "outage": {
+      "events": 697,
+      "step1_sent": 697,
+      "step1_by_copy_source": {
+        "llm": 0,
+        "template": 697
+      },
+      "event_to_send_s_p50": 0.26,
+      "event_to_send_s_p95": 0.36
+    },
+    "recovery": {
+      "events": 348,
+      "step1_sent": 348,
+      "step1_by_copy_source": {
+        "llm": 346,
+        "template": 2
+      },
+      "event_to_send_s_p50": 0.41,
+      "event_to_send_s_p95": 0.51
+    }
+  }
+}
