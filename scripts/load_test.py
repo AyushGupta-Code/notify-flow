@@ -103,7 +103,7 @@ async def main() -> None:
     drain_s = time.perf_counter() - t0
     async with engine.connect() as conn:
         e2e = [
-            r[0]
+            float(r[0])
             for r in (
                 await conn.execute(
                     text(
@@ -114,14 +114,11 @@ async def main() -> None:
                 )
             ).all()
         ]
-        dup_sends = (
+        # What members would have received for step 1, counted at the (fake) vendor.
+        step1_deliveries = (
             await conn.execute(
-                text(
-                    "select count(*) from (select event_id, step from provider_deliveries d "
-                    "join notifications n using (idempotency_key) where n.event_id like :p "
-                    "group by event_id, step having count(*) > 1) x"
-                ),
-                {"p": f"evt-{run}-%"},
+                text("select count(*) from provider_deliveries where idempotency_key like :p"),
+                {"p": f"evt-{run}-%:1"},
             )
         ).scalar_one()
     await engine.dispose()
@@ -140,7 +137,7 @@ async def main() -> None:
         "end_to_end_events_per_s": round(sent / drain_s, 1) if drain_s else None,
         "event_to_send_s_p50": round(statistics.median(e2e), 2) if e2e else None,
         "event_to_send_s_p95": round(pct(e2e, 95), 2) if e2e else None,
-        "duplicate_sends": dup_sends,
+        "step1_vendor_deliveries": step1_deliveries,
     }
     print(json.dumps(result, indent=2))
     if a.out:

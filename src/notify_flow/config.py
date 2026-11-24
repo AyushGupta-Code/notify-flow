@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     kafka_topic: str = "member-events"
     kafka_group: str = "notify-flow-ingest"
     sqs_queue_url: str = ""
+    sqs_pollers: int = 1  # concurrent receive loops; each handles its batch concurrently
     aws_endpoint_url: str | None = None  # LocalStack / moto endpoint
     aws_region: str = "us-east-1"
 

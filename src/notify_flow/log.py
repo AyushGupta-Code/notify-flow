@@ -38,6 +38,8 @@ def _redact_pii(_: Any, __: str, event_dict: MutableMapping[str, Any]) -> dict[s
 
 def configure_logging(level: str = "INFO", service: str = "notify-flow") -> None:
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=level)
+    for noisy in ("httpx", "botocore", "aiokafka"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,

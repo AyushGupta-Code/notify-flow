@@ -32,7 +32,7 @@ def build_consumer(s: Settings) -> EventConsumer:
     if s.queue_backend == "sqs":
         from notify_flow.queue.sqs import SqsEventConsumer
 
-        return SqsEventConsumer(boto_client("sqs", s), s.sqs_queue_url)
+        return SqsEventConsumer(boto_client("sqs", s), s.sqs_queue_url, pollers=s.sqs_pollers)
     raise ValueError(s.queue_backend)
 
 

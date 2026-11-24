@@ -34,11 +34,16 @@ class SqsPublisher:
 
 
 class SqsEventConsumer:
-    def __init__(self, client: Any, queue_url: str, wait_s: int = 10, batch: int = 10) -> None:
+    def __init__(
+        self, client: Any, queue_url: str, wait_s: int = 10, batch: int = 10, pollers: int = 1
+    ) -> None:
         self.sqs = client
         self.url = queue_url
         self.wait_s = wait_s
         self.batch = batch
+        # Standard SQS queues are unordered, and the handler is idempotent, so messages in a
+        # batch and several poll loops can be handled concurrently.
+        self.pollers = pollers
         self._stopping = asyncio.Event()
 
     async def poll_once(self, handler: Handler) -> int:
@@ -49,8 +54,8 @@ class SqsEventConsumer:
             WaitTimeSeconds=self.wait_s,
             MessageAttributeNames=["All"],
         )
-        handled = 0
-        for m in resp.get("Messages", []):
+
+        async def one(m: dict[str, Any]) -> bool:
             attrs = {k: v["StringValue"] for k, v in m.get("MessageAttributes", {}).items()}
             try:
                 await handler(QueueMessage(attrs.pop("member_id", ""), m["Body"].encode(), attrs))
@@ -58,11 +63,13 @@ class SqsEventConsumer:
                 # Leave it: it becomes visible again after the visibility timeout and moves
                 # to the DLQ after maxReceiveCount (redrive policy on the queue).
                 log.exception("sqs.handler_failed")
-                continue
+                return False
             await asyncio.to_thread(
                 self.sqs.delete_message, QueueUrl=self.url, ReceiptHandle=m["ReceiptHandle"]
             )
-            handled += 1
+            return True
+
+        handled = sum(await asyncio.gather(*(one(m) for m in resp.get("Messages", []))))
         attrs = await asyncio.to_thread(
             self.sqs.get_queue_attributes,
             QueueUrl=self.url,
@@ -72,8 +79,11 @@ class SqsEventConsumer:
         return handled
 
     async def run(self, handler: Handler) -> None:
-        while not self._stopping.is_set():
-            await self.poll_once(handler)
+        async def loop() -> None:
+            while not self._stopping.is_set():
+                await self.poll_once(handler)
+
+        await asyncio.gather(*(loop() for _ in range(self.pollers)))
 
     async def stop(self) -> None:
         self._stopping.set()
