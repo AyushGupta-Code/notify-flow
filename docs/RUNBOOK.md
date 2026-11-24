@@ -42,6 +42,10 @@ members may miss or double-receive messages; `warning` means degraded but still 
 **Meaning:** at least one worker's breaker has been open for 2 min. Copy is coming from
 templates; the LLM is not being called except one trial request every `NF_BREAKER_RESET_S`.
 
+0. Expect `reason="circuit_open"`, not `llm_error`, as the dominant fallback reason. Under
+   concurrent load the first failing calls trip the breaker within seconds, so retries hit
+   the open breaker instead of exhausting their attempts (seen in the
+   [2026-11-24 drill](incidents/2026-11-24-llm-outage-drill.md)).
 1. Confirm provider health (Ollama: `curl $NF_LLM_BASE_URL/api/tags`; Anthropic: status page).
 2. Nothing else is required to keep members served: fallback is automatic and templates are
    reviewed copy. Do **not** restart workers to "reset" the breaker; it closes on its own

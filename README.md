@@ -1,5 +1,7 @@
 # notify-flow
 
+[![ci](https://github.com/AyushGupta-Code/notify-flow/actions/workflows/ci.yml/badge.svg)](https://github.com/AyushGupta-Code/notify-flow/actions/workflows/ci.yml)
+
 An event-driven member-notification service for a fictional digital MSK (musculoskeletal)
 care program. It decides **what** message a member gets, **when** (outside their quiet
 hours), and on **which channel**, then follows up on a second channel if they don't engage.
@@ -135,3 +137,100 @@ python scripts/train_channel_model.py    # regenerate models/channel_lr_v1.json
 Use a real model with `NF_LLM_PROVIDER=ollama NF_LLM_MODEL=<model>` or
 `NF_LLM_PROVIDER=anthropic NF_ANTHROPIC_API_KEY=...`, and score it with
 `python -m evals.run_eval --provider ollama --model <model>`.
+
+## Measured numbers
+
+Everything below was produced by a command in this repo. Nothing is extrapolated.
+
+**Tests.** 54 tests: 38 unit + 16 integration. Locally 53 pass and the Kafka test is
+skipped (no broker on the dev machine); in CI all 54 pass, including Kafka.
+`pytest` / CI job `test`.
+
+**Eval** (`python -m evals.run_eval`, mock provider):
+33/33 LLM-eligible messages pass the rubric (3 more are template-only by policy), and the
+checker catches 17/17 known-bad samples with 0/3 false positives on known-good samples.
+The 100% pass rate only shows the pipeline (whitelisting, prompt assembly, scoring) works
+end to end. The mock provider writes compliant copy by construction, so it says nothing about a real
+model's quality. Run the same harness with `--provider ollama|anthropic` for that.
+
+**Channel model** (`python scripts/train_channel_model.py`, seed 42, 20,000 synthetic rows
+per channel, 25% held out): held-out AUC push 0.706, SMS 0.679, email 0.650. The data comes
+from a known logistic function plus noise, so this measures whether the training pipeline
+recovers it, not real member behaviour.
+
+**Load test** (`scripts/load_test.py --events 500 --members 100 --concurrency 20`, plus 50
+duplicate posts; docker-free stack on an 8-core WSL2 laptop: uvicorn with 2 workers, moto as
+SQS, Temporal dev server, fake LLM with 150 ms latency, 20 s engagement window so each event
+also escalates). Raw JSON is in `docs/incidents/data/`.
+
+| Configuration | All 500 step-1 sends done | Event→send p50 / p95 | API ingest |
+|---|---|---|---|
+| Sequential SQS consumer, Temporal dev server on SQLite file | 171 s (from DB timestamps; consumer alone took 115 s) | n/a (script crashed on output; fixed) | 500 events accepted in 2.7 s |
+| 4 concurrent SQS pollers, Temporal on SQLite file | 135.2 s | 83.4 s / 128.1 s | 186 posts/s, p50 78 ms, p95 252 ms |
+| 4 pollers, Temporal in-memory, 1 worker | **18.0 s (27.8 events/s)** | **10.6 s / 14.8 s** | 128 posts/s, p50 117 ms, p95 382 ms |
+| 4 pollers, Temporal in-memory, 3 workers | 21.1 s | 12.6 s / 16.8 s | 127 posts/s, p50 125 ms, p95 332 ms |
+
+In every run, 50 of 550 posts were rejected as duplicates and the vendor received exactly 500
+step-1 deliveries. How I read these: the consumer change was a real fix (consume time
+115 s → 19.8 s). The jump from 135 s to 18 s came from the Temporal dev server's SQLite
+persistence on this machine: workflow tasks waited up to 96 s to be picked up while
+activities started instantly. That is a property of the local dev server, not of the
+service, and a production Temporal cluster has a different profile. Adding workers did not
+help here, so the next bottleneck on this machine is somewhere in the single-process dev
+server or consumer. I did not dig further.
+
+**LLM-outage drill** ([postmortem](docs/incidents/2026-11-24-llm-outage-drill.md)): 4
+events/s for 331 s with the LLM killed for 180 s. 1,277/1,277 step-1 messages sent, 0 send
+failures; 697 sent during the outage, all from fallback templates. Breaker open 2.2 s after
+the kill, closed 2.9 s after the restore. Event→send p50 was 0.39 s at baseline and 0.26 s
+during the outage.
+
+**CI** (GitHub Actions): lint + mypy, tests with Postgres and Kafka service containers, eval,
+promtool rule tests (synthetic and drill replay), docker-compose smoke test (end to end with
+duplicate rejection and escalation, Prometheus scraping all 4 components, Grafana dashboard
+provisioned), and a kind deploy with the same smoke test running through the cluster.
+
+## Verified vs untested
+
+| Component | Status |
+|---|---|
+| FastAPI, outbox, Postgres, Alembic migration (up/down) | Verified: tests, local stack, compose and kind in CI |
+| Temporal workflow (timers, signals, escalation, retries) | Verified: Temporal test server in tests; dev server locally; Temporal `auto-setup` in compose and kind (CI) |
+| Kafka adapter | Verified in CI only (test with a real broker, plus the compose and kind smoke tests). No broker on the dev machine. |
+| SQS adapter | Verified against **moto** (tests and the local stack's load test and drill). **Not run against real AWS or LocalStack.** |
+| Step Functions adapter + ASL | The definition deploys to **moto**, structural checks pass, and duplicate starts create one execution. **Moto does not execute the states**, the Lambda handlers the ASL references are not written, and it has **not run on real AWS or LocalStack.** It is a design artifact with a tested start path, not a working pipeline. |
+| LocalStack (`--profile aws`) | **Untested.** Included for convenience only. |
+| Ollama provider | Exercised against `scripts/fake_ollama.py` (Ollama's API shape), **not a real Ollama model.** |
+| Anthropic provider | **Untested** (no API key used). |
+| Docker images, docker-compose | Verified in CI (no Docker on the dev machine) |
+| Kubernetes manifests | Verified on kind in CI: rollouts, migration Job, end-to-end smoke test. Not tested on EKS or any managed cluster. |
+| Prometheus alerts | `promtool check` and rule unit tests in CI, including a replay of the drill's measured metrics. Alertmanager routing is not configured. |
+| Grafana dashboard | Provisioning verified in CI (dashboard loads, 14 panels). Panels were not visually reviewed under load. |
+| Airflow | **Skipped.** A nightly retrain-and-eval DAG would be the natural fit, but it was out of scope. |
+
+## Open gaps
+
+- No real on-call experience: the runbook and postmortem come from a drill on a laptop.
+- No real model evaluated: the eval ran only against the mock provider.
+- Real AWS and the Step Functions path are not runnable end to end (see above).
+- No vendor failover: if one channel's vendor is down, sends retry and then fail; they do not
+  switch to another channel.
+- No per-member rate limiting or frequency caps across campaigns.
+- No auth on the API (admin endpoints included). It would sit behind a gateway or mTLS in a
+  real deployment.
+- The channel model is trained on synthetic data; there is no online feedback loop or A/B
+  test of model vs rules.
+- No HIPAA controls beyond data minimization and log redaction (no encryption-at-rest
+  configuration, audit log, or BAA-covered LLM provider).
+
+## Layout
+
+```
+src/notify_flow/   api/ (FastAPI)  workflows/ (Temporal workflow + activities)
+                   queue/ (Kafka, SQS)  orchestrator/ (Temporal, Step Functions)
+                   llm/ (providers, resilience, registry, guardrails, personalize)
+                   channel/ (model + rules)  ingest.py  relay.py  sender.py  log.py  metrics.py
+prompts/registry.yaml   models/channel_lr_v1.json   migrations/   aws/stepfunctions/
+evals/              tests/unit  tests/integration   scripts/ (train, load test, drill, local stack)
+deploy/ (k8s, prometheus, grafana)   docs/ (RUNBOOK.md, incidents/)
+```
