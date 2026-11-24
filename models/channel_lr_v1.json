@@ -1,0 +1,57 @@
+{
+  "version": "channel-lr-v1",
+  "features": [
+    "program_week",
+    "sessions_last_7d",
+    "days_since_last_session",
+    "channel_open_rate",
+    "hour_sin",
+    "hour_cos",
+    "is_preferred"
+  ],
+  "seed": 42,
+  "n": 20000,
+  "channels": {
+    "push": {
+      "coef": [
+        -0.221367,
+        1.084427,
+        -1.500993,
+        2.439828,
+        0.197098,
+        0.562686,
+        0.829137
+      ],
+      "intercept": -1.535262
+    },
+    "sms": {
+      "coef": [
+        0.117593,
+        0.759547,
+        -0.759434,
+        1.914648,
+        -0.382949,
+        0.333134,
+        0.951461
+      ],
+      "intercept": -1.276184
+    },
+    "email": {
+      "coef": [
+        0.466149,
+        0.409238,
+        -0.335317,
+        2.046381,
+        0.075495,
+        -0.533679,
+        0.597435
+      ],
+      "intercept": -1.930798
+    }
+  },
+  "heldout_auc": {
+    "push": 0.7063,
+    "sms": 0.6786,
+    "email": 0.6503
+  }
+}
