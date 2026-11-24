@@ -25,7 +25,8 @@ class Plan:
     escalation_channel: str | None = None
     decision_source: str = "rules"
     channel_model_version: str | None = None
-    send_after_epoch: float = 0.0
+    timezone: str = "UTC"
+    quiet_hours: tuple[int, int] | None = None  # (start, end) local hours; None = disabled
     context: dict[str, Any] = field(default_factory=dict)  # non-identifying features only
 
 

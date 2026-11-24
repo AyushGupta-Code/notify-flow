@@ -21,7 +21,6 @@ from notify_flow.metrics import (
     SEND_DUPLICATES_SUPPRESSED,
     SEND_FAILURES,
 )
-from notify_flow.quiet_hours import next_allowed_send
 from notify_flow.sender import ChannelProvider
 from notify_flow.types import (
     ComposeInput,
@@ -59,14 +58,6 @@ class NotificationActivities:
         self.provider = provider
         self.settings = settings
 
-    def _send_after(self, m: Member) -> float:
-        now = datetime.now(UTC)
-        if not self.settings.quiet_hours_enabled:
-            return now.timestamp()
-        return next_allowed_send(
-            now, m.timezone, self.settings.quiet_hours_start, self.settings.quiet_hours_end
-        ).timestamp()
-
     @activity.defn(name="plan_notification")
     async def plan_notification(self, inp: NotificationInput) -> Plan:
         correlation_id.set(inp.correlation_id)
@@ -103,6 +94,11 @@ class NotificationActivities:
             source=d.source,
             model_version=d.model_version,
         )
+        quiet = (
+            (self.settings.quiet_hours_start, self.settings.quiet_hours_end)
+            if self.settings.quiet_hours_enabled
+            else None
+        )
         return Plan(
             skip=False,
             reason="ok",
@@ -110,15 +106,10 @@ class NotificationActivities:
             escalation_channel=d.escalation_channel,
             decision_source=d.source,
             channel_model_version=d.model_version,
-            send_after_epoch=self._send_after(m),
+            timezone=m.timezone,
+            quiet_hours=quiet,
             context={k: v for k, v in context.items() if v is not None},
         )
-
-    @activity.defn(name="next_send_time")
-    async def next_send_time(self, member_id: str) -> float:
-        async with self.sm() as s:
-            m = await s.get(Member, member_id)
-        return self._send_after(m) if m else datetime.now(UTC).timestamp()
 
     @activity.defn(name="compose_message")
     async def compose_message(self, inp: ComposeInput) -> CopyResult:
@@ -202,7 +193,6 @@ class NotificationActivities:
     def all(self) -> list[Callable[..., Any]]:
         return [
             self.plan_notification,
-            self.next_send_time,
             self.compose_message,
             self.send_notification,
         ]

@@ -22,8 +22,9 @@ def test_campaign_mapping():
 
 def test_schema_rejects_unknown_version_and_type():
     with pytest.raises(ValidationError):
-        MemberEvent(event_id="evt-00000001", member_id="m1", event_type="enrolled",
-                    schema_version=2)
+        MemberEvent(
+            event_id="evt-00000001", member_id="m1", event_type="enrolled", schema_version=2
+        )
     with pytest.raises(ValidationError):
         MemberEvent(event_id="evt-00000001", member_id="m1", event_type="hacked")
 

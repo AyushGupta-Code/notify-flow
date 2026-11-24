@@ -7,9 +7,17 @@ MODEL = REPO_ROOT / "models" / "channel_lr_v1.json"
 
 
 def feats(**kw):
-    base = dict(program_week=4, sessions_last_7d=2, days_since_last_session=5,
-                open_rate_sms=0.2, open_rate_push=0.9, open_rate_email=0.1, local_hour=12,
-                preferred_channel=None, eligible=("push", "sms", "email"))
+    base = dict(
+        program_week=4,
+        sessions_last_7d=2,
+        days_since_last_session=5,
+        open_rate_sms=0.2,
+        open_rate_push=0.9,
+        open_rate_email=0.1,
+        local_hour=12,
+        preferred_channel=None,
+        eligible=("push", "sms", "email"),
+    )
     base.update(kw)
     return MemberFeatures(**base)
 

@@ -34,8 +34,9 @@ class FixedProvider:
 
 
 def make(provider, threshold=5):
-    return Personalizer(REG, provider, CircuitBreaker(threshold, 30), timeout_s=1,
-                        max_attempts=2, backoff_base_s=0)
+    return Personalizer(
+        REG, provider, CircuitBreaker(threshold, 30), timeout_s=1, max_attempts=2, backoff_base_s=0
+    )
 
 
 async def test_llm_copy_is_versioned():
@@ -82,9 +83,17 @@ async def test_clinical_campaign_never_calls_llm():
 
 async def test_prompt_only_contains_whitelisted_context():
     p = FixedProvider("Hi {first_name}, a short session today still counts.")
-    await make(p).compose("reengage", "sms", {"program_week": 3, "days_since_last_session": 9,
-                                              "first_name": "Priya", "email": "p@x.io",
-                                              "diagnosis": "lumbar"})
+    await make(p).compose(
+        "reengage",
+        "sms",
+        {
+            "program_week": 3,
+            "days_since_last_session": 9,
+            "first_name": "Priya",
+            "email": "p@x.io",
+            "diagnosis": "lumbar",
+        },
+    )
     prompt = p.prompts[0]
     assert "Priya" not in prompt and "p@x.io" not in prompt and "lumbar" not in prompt
     assert '"days_since_last_session": 9' in prompt

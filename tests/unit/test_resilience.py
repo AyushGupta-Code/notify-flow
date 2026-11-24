@@ -44,8 +44,9 @@ async def test_retries_then_succeeds():
         return "ok"
 
     b = CircuitBreaker(5, 30)
-    out = await call_with_retries(flaky, breaker=b, timeout_s=1, max_attempts=3,
-                                  backoff_base_s=0.01, sleep=nosleep)
+    out = await call_with_retries(
+        flaky, breaker=b, timeout_s=1, max_attempts=3, backoff_base_s=0.01, sleep=nosleep
+    )
     assert out == "ok" and calls == 3 and b.state == "closed"
 
 
@@ -55,8 +56,9 @@ async def test_timeout_counts_as_failure():
 
     b = CircuitBreaker(5, 30)
     with pytest.raises(TimeoutError):
-        await call_with_retries(slow, breaker=b, timeout_s=0.01, max_attempts=2,
-                                backoff_base_s=0, sleep=nosleep)
+        await call_with_retries(
+            slow, breaker=b, timeout_s=0.01, max_attempts=2, backoff_base_s=0, sleep=nosleep
+        )
 
 
 async def test_open_breaker_short_circuits_without_calling():

@@ -20,6 +20,9 @@ _NAME_RE = re.compile(r"[^A-Za-z0-9_-]")
 def execution_name(event_id: str) -> str:
     # Execution names are unique per state machine for 90 days, which gives the same
     # duplicate-start protection as a Temporal workflow ID. Max 80 chars, limited charset.
+    # AWS returns the existing execution for an identical start of a running execution and
+    # raises ExecutionAlreadyExists otherwise; either way only one execution exists, but
+    # `started` can be True for a duplicate here, unlike the Temporal adapter.
     return _NAME_RE.sub("_", workflow_id_for(event_id))[:80]
 
 

@@ -11,6 +11,7 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
+    from notify_flow.quiet_hours import next_allowed_send
     from notify_flow.types import (
         ComposeInput,
         CopyResult,
@@ -46,8 +47,14 @@ class MemberNotificationWorkflow:
     def status(self) -> str:
         return self._status
 
-    async def _wait_until(self, epoch: float) -> None:
-        delay = epoch - workflow.now().timestamp()
+    async def _wait_for_quiet_hours(self, plan: Plan) -> None:
+        # Computed from workflow.now(): deterministic on replay and on the same clock as
+        # the durable timer, so a worker restart mid-wait resumes correctly.
+        if plan.quiet_hours is None:
+            return
+        now = workflow.now()
+        start, end = plan.quiet_hours
+        delay = (next_allowed_send(now, plan.timezone, start, end) - now).total_seconds()
         if delay > 0:
             self._status = "waiting_quiet_hours"
             await workflow.sleep(timedelta(seconds=delay))
@@ -85,7 +92,7 @@ class MemberNotificationWorkflow:
             self._status = f"skipped:{plan.reason}"
             return {"status": "skipped", "reason": plan.reason}
 
-        await self._wait_until(plan.send_after_epoch)
+        await self._wait_for_quiet_hours(plan)
         first = await self._compose_and_send(inp, plan, plan.channel, 1)
 
         self._status = "awaiting_engagement"
@@ -98,14 +105,7 @@ class MemberNotificationWorkflow:
 
         sends = [first.status]
         if not self._engaged and plan.escalation_channel and inp.campaign != "pain_checkin":
-            nxt = await workflow.execute_activity(
-                "next_send_time",
-                inp.member_id,
-                result_type=float,
-                start_to_close_timeout=ACT_TIMEOUT,
-                retry_policy=RETRY,
-            )
-            await self._wait_until(nxt)
+            await self._wait_for_quiet_hours(plan)
             second = await self._compose_and_send(inp, plan, plan.escalation_channel, 2)
             sends.append(second.status)
 
