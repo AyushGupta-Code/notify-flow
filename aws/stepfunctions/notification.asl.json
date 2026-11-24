@@ -4,9 +4,7 @@
   "States": {
     "SelectChannel": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${SelectChannelFunctionArn}", "Payload.$": "$"},
-      "OutputPath": "$.Payload",
+      "Resource": "${SelectChannelFunctionArn}",
       "TimeoutSeconds": 30,
       "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
@@ -19,9 +17,7 @@
     },
     "CheckQuietHours": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${QuietHoursFunctionArn}", "Payload.$": "$"},
-      "OutputPath": "$.Payload",
+      "Resource": "${QuietHoursFunctionArn}",
       "TimeoutSeconds": 30,
       "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
@@ -30,9 +26,7 @@
     "WaitForQuietHours": {"Type": "Wait", "SecondsPath": "$.quiet_wait_seconds", "Next": "PersonalizeFirst"},
     "PersonalizeFirst": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${PersonalizeFunctionArn}", "Payload.$": "$"},
-      "OutputPath": "$.Payload",
+      "Resource": "${PersonalizeFunctionArn}",
       "TimeoutSeconds": 30,
       "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
@@ -40,9 +34,7 @@
     },
     "SendFirst": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${SendFunctionArn}", "Payload.$": "$"},
-      "OutputPath": "$.Payload",
+      "Resource": "${SendFunctionArn}",
       "TimeoutSeconds": 30,
       "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 8, "MaxDelaySeconds": 30, "JitterStrategy": "FULL"}],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
@@ -51,9 +43,7 @@
     "WaitForEngagementWindow": {"Type": "Wait", "SecondsPath": "$.engagement_wait_s", "Next": "CheckEngagement"},
     "CheckEngagement": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${EngagementFunctionArn}", "Payload.$": "$"},
-      "OutputPath": "$.Payload",
+      "Resource": "${EngagementFunctionArn}",
       "TimeoutSeconds": 30,
       "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
@@ -75,9 +65,7 @@
     },
     "PrepareEscalation": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${EscalationFunctionArn}", "Payload.$": "$"},
-      "OutputPath": "$.Payload",
+      "Resource": "${EscalationFunctionArn}",
       "TimeoutSeconds": 30,
       "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
@@ -85,9 +73,7 @@
     },
     "PersonalizeEscalation": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${PersonalizeFunctionArn}", "Payload.$": "$"},
-      "OutputPath": "$.Payload",
+      "Resource": "${PersonalizeFunctionArn}",
       "TimeoutSeconds": 30,
       "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
@@ -95,9 +81,7 @@
     },
     "SendEscalation": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${SendFunctionArn}", "Payload.$": "$"},
-      "OutputPath": "$.Payload",
+      "Resource": "${SendFunctionArn}",
       "TimeoutSeconds": 30,
       "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 8, "MaxDelaySeconds": 30, "JitterStrategy": "FULL"}],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],

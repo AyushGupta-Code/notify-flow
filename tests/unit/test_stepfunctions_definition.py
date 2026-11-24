@@ -38,3 +38,9 @@ def test_definition_references_all_lambda_handlers():
         "${EngagementFunctionArn}",
         "${EscalationFunctionArn}",
     } <= set(part for part in raw.replace('"', " ").replace(",", " ").split() if "${" in part)
+
+
+def test_lambda_tasks_return_handler_payload_and_preserve_catch_input():
+    tasks = [state for state in definition()["States"].values() if state["Type"] == "Task"]
+    assert all(task["Resource"].startswith("${") for task in tasks)
+    assert all("OutputPath" not in task and "Parameters" not in task for task in tasks)

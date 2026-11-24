@@ -21,9 +21,14 @@ def execution_name(event_id: str) -> str:
     # Execution names are unique per state machine for 90 days, which gives the same
     # duplicate-start protection as a Temporal workflow ID. Max 80 chars, limited charset.
     # AWS returns the existing execution for an identical start of a running execution and
-    # raises ExecutionAlreadyExists otherwise; either way only one execution exists, but
-    # `started` can be True for a duplicate here, unlike the Temporal adapter.
+    # raises ExecutionAlreadyExists otherwise; either way only one execution exists.
     return _NAME_RE.sub("_", workflow_id_for(event_id))[:80]
+
+
+def execution_arn(state_machine_arn: str, name: str) -> str:
+    prefix, resource = state_machine_arn.rsplit(":stateMachine:", 1)
+    state_machine_name = resource.split(":", 1)[0]
+    return f"{prefix}:execution:{state_machine_name}:{name}"
 
 
 class StepFunctionsOrchestrator:
@@ -43,6 +48,13 @@ class StepFunctionsOrchestrator:
 
     async def start_notification(self, inp: NotificationInput) -> StartResult:
         name = execution_name(inp.event_id)
+        arn = execution_arn(self.arn, name)
+        try:
+            await asyncio.to_thread(self.sfn.describe_execution, executionArn=arn)
+        except self.sfn.exceptions.ExecutionDoesNotExist:
+            pass
+        else:
+            return StartResult(name, started=False)
         try:
             await asyncio.to_thread(
                 self.sfn.start_execution,

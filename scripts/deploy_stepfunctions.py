@@ -22,7 +22,7 @@ from botocore.exceptions import ClientError
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_PACKAGES = [
     "asyncpg>=0.29",
-    "sqlalchemy>=2.0.30",
+    "sqlalchemy[asyncio]>=2.0.30",
     "httpx>=0.27",
     "structlog>=24.1",
     "prometheus-client>=0.20",
