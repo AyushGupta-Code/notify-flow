@@ -69,6 +69,48 @@ jobs:
         if: always()
         with: {name: eval-report, path: eval-report.json}
 
+  stepfunctions-localstack:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: {POSTGRES_PASSWORD: postgres, POSTGRES_DB: notify_flow_test}
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-retries 20
+      localstack:
+        image: localstack/localstack:3.8.1
+        ports: ["4566:4566"]
+        env:
+          SERVICES: lambda,stepfunctions,iam,logs,sts
+          LAMBDA_DOCKER_NETWORK: host
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+        options: >-
+          --health-cmd "curl -sf http://localhost:4566/_localstack/health"
+          --health-interval 5s --health-retries 30
+    env:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      NF_TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/notify_flow_test
+      NF_LOCALSTACK_ENDPOINT: http://localhost:4566
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv -p 3.12 && uv pip install -e '.[dev]'
+      - run: .venv/bin/alembic upgrade head
+      - name: deploy Lambda functions and executable state machine
+        run: |
+          .venv/bin/python scripts/deploy_stepfunctions.py \
+            --endpoint-url "$NF_LOCALSTACK_ENDPOINT" \
+            --database-url postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/notify_flow_test \
+            > stepfunctions-deploy.json
+          echo "NF_SFN_STATE_MACHINE_ARN=$(jq -r .state_machine_arn stepfunctions-deploy.json)" >> "$GITHUB_ENV"
+          cat stepfunctions-deploy.json
+      - name: real Step Functions and Lambda integration tests
+        run: .venv/bin/pytest -v tests/integration/test_stepfunctions_localstack.py
+
   alerts:
     runs-on: ubuntu-latest
     steps:

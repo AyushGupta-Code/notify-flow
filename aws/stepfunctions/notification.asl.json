@@ -1,82 +1,114 @@
 {
-  "Comment": "notify-flow member notification: the Step Functions twin of MemberNotificationWorkflow. ${...} placeholders are filled via DefinitionSubstitutions (see aws/README.md).",
-  "StartAt": "PlanNotification",
+  "Comment": "Executable notify-flow workflow. DefinitionSubstitutions are populated by scripts/deploy_stepfunctions.py.",
+  "StartAt": "SelectChannel",
   "States": {
-    "PlanNotification": {
+    "SelectChannel": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${PlanFunctionArn}", "Payload.$": "$"},
-      "ResultSelector": {"plan.$": "$.Payload"},
-      "ResultPath": "$.planResult",
-      "Retry": [{"ErrorEquals": ["States.TaskFailed", "Lambda.ServiceException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 6, "JitterStrategy": "FULL"}],
+      "Parameters": {"FunctionName": "${SelectChannelFunctionArn}", "Payload.$": "$"},
+      "OutputPath": "$.Payload",
+      "TimeoutSeconds": 30,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
       "Next": "ShouldSend"
     },
     "ShouldSend": {
       "Type": "Choice",
-      "Choices": [{"Variable": "$.planResult.plan.skip", "BooleanEquals": true, "Next": "Skipped"}],
-      "Default": "WaitForQuietHours"
+      "Choices": [{"Variable": "$.plan.skip", "BooleanEquals": true, "Next": "Skipped"}],
+      "Default": "CheckQuietHours"
     },
-    "Skipped": {"Type": "Succeed"},
-    "WaitForQuietHours": {
-      "Type": "Wait",
-      "TimestampPath": "$.planResult.plan.send_after_iso",
-      "Next": "ComposeFirst"
-    },
-    "ComposeFirst": {
+    "CheckQuietHours": {
       "Type": "Task",
-      "Comment": "Falls back to the versioned template inside the function; never fails on LLM errors.",
       "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${ComposeFunctionArn}", "Payload": {"input.$": "$", "step": 1}},
-      "ResultSelector": {"copy.$": "$.Payload"},
-      "ResultPath": "$.copy1",
-      "TimeoutSeconds": 60,
-      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 2, "BackoffRate": 2.0, "MaxAttempts": 4}],
+      "Parameters": {"FunctionName": "${QuietHoursFunctionArn}", "Payload.$": "$"},
+      "OutputPath": "$.Payload",
+      "TimeoutSeconds": 30,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
+      "Next": "WaitForQuietHours"
+    },
+    "WaitForQuietHours": {"Type": "Wait", "SecondsPath": "$.quiet_wait_seconds", "Next": "PersonalizeFirst"},
+    "PersonalizeFirst": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {"FunctionName": "${PersonalizeFunctionArn}", "Payload.$": "$"},
+      "OutputPath": "$.Payload",
+      "TimeoutSeconds": 30,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
       "Next": "SendFirst"
     },
     "SendFirst": {
       "Type": "Task",
-      "Comment": "Idempotent on event_id:step, so retries cannot double-send.",
       "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${SendFunctionArn}", "Payload": {"input.$": "$", "step": 1}},
-      "ResultPath": "$.send1",
-      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 8}],
-      "Next": "WaitForEngagement"
+      "Parameters": {"FunctionName": "${SendFunctionArn}", "Payload.$": "$"},
+      "OutputPath": "$.Payload",
+      "TimeoutSeconds": 30,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 8, "MaxDelaySeconds": 30, "JitterStrategy": "FULL"}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
+      "Next": "WaitForEngagementWindow"
     },
-    "WaitForEngagement": {
+    "WaitForEngagementWindow": {"Type": "Wait", "SecondsPath": "$.engagement_wait_s", "Next": "CheckEngagement"},
+    "CheckEngagement": {
       "Type": "Task",
-      "Comment": "Stores the task token; POST /v1/notifications/{id}/engagement calls SendTaskSuccess.",
-      "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
-      "Parameters": {"FunctionName": "${StoreTokenFunctionArn}", "Payload": {"workflow_id.$": "$$.Execution.Name", "task_token.$": "$$.Task.Token"}},
-      "TimeoutSeconds": 172800,
-      "ResultPath": "$.engagement",
-      "Retry": [{"ErrorEquals": ["Lambda.ServiceException"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3}],
-      "Catch": [{"ErrorEquals": ["States.Timeout"], "ResultPath": "$.engagementTimeout", "Next": "HasEscalationChannel"}],
-      "Next": "Engaged"
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {"FunctionName": "${EngagementFunctionArn}", "Payload.$": "$"},
+      "OutputPath": "$.Payload",
+      "TimeoutSeconds": 30,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
+      "Next": "WasEngaged"
     },
-    "Engaged": {"Type": "Succeed"},
-    "HasEscalationChannel": {
+    "WasEngaged": {
       "Type": "Choice",
-      "Choices": [{"And": [{"Variable": "$.planResult.plan.escalation_channel", "IsPresent": true}, {"Variable": "$.planResult.plan.escalation_channel", "IsNull": false}], "Next": "ComposeEscalation"}],
-      "Default": "Completed"
+      "Choices": [{"Variable": "$.engaged", "BooleanEquals": true, "Next": "Completed"}],
+      "Default": "CanEscalate"
     },
-    "ComposeEscalation": {
+    "CanEscalate": {
+      "Type": "Choice",
+      "Choices": [
+        {"Variable": "$.plan.escalation_channel", "IsPresent": false, "Next": "Completed"},
+        {"Variable": "$.plan.escalation_channel", "IsNull": true, "Next": "Completed"},
+        {"Variable": "$.campaign", "StringEquals": "pain_checkin", "Next": "Completed"}
+      ],
+      "Default": "PrepareEscalation"
+    },
+    "PrepareEscalation": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${ComposeFunctionArn}", "Payload": {"input.$": "$", "step": 2}},
-      "ResultSelector": {"copy.$": "$.Payload"},
-      "ResultPath": "$.copy2",
-      "TimeoutSeconds": 60,
-      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 2, "BackoffRate": 2.0, "MaxAttempts": 4}],
+      "Parameters": {"FunctionName": "${EscalationFunctionArn}", "Payload.$": "$"},
+      "OutputPath": "$.Payload",
+      "TimeoutSeconds": 30,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
+      "Next": "PersonalizeEscalation"
+    },
+    "PersonalizeEscalation": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {"FunctionName": "${PersonalizeFunctionArn}", "Payload.$": "$"},
+      "OutputPath": "$.Payload",
+      "TimeoutSeconds": 30,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 3, "MaxDelaySeconds": 8, "JitterStrategy": "FULL"}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
       "Next": "SendEscalation"
     },
     "SendEscalation": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "${SendFunctionArn}", "Payload": {"input.$": "$", "step": 2}},
-      "ResultPath": "$.send2",
-      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 8}],
+      "Parameters": {"FunctionName": "${SendFunctionArn}", "Payload.$": "$"},
+      "OutputPath": "$.Payload",
+      "TimeoutSeconds": 30,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 1, "BackoffRate": 2.0, "MaxAttempts": 8, "MaxDelaySeconds": 30, "JitterStrategy": "FULL"}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.caught_error", "Next": "CaughtFailure"}],
       "Next": "Completed"
     },
-    "Completed": {"Type": "Succeed"}
+    "Skipped": {"Type": "Succeed"},
+    "Completed": {"Type": "Succeed"},
+    "CaughtFailure": {
+      "Type": "Pass",
+      "Parameters": {"status": "caught", "error.$": "$.caught_error", "event_id.$": "$.event_id", "correlation_id.$": "$.correlation_id"},
+      "End": true
+    }
   }
 }

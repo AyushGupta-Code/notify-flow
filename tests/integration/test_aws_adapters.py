@@ -12,9 +12,7 @@ from moto import mock_aws
 from notify_flow.config import REPO_ROOT
 from notify_flow.ingest import IngestHandler
 from notify_flow.orchestrator.base import StartResult
-from notify_flow.orchestrator.stepfunctions import StepFunctionsOrchestrator, execution_name
 from notify_flow.queue.sqs import SqsEventConsumer, SqsPublisher
-from notify_flow.types import NotificationInput
 
 pytestmark = pytest.mark.integration
 
@@ -107,34 +105,18 @@ async def test_sqs_failed_handler_leaves_message_for_redelivery(aws):
     assert await consumer.poll_once(ok) == 1 and len(seen) == 1
 
 
-async def test_step_functions_definition_deploys_and_dedups_starts(aws):
+async def test_step_functions_definition_registers_in_moto(aws):
     sfn = boto3.client("stepfunctions", region_name="us-east-1")
     iam = boto3.client("iam", region_name="us-east-1")
     role = iam.create_role(RoleName="sfn", AssumeRolePolicyDocument="{}")["Role"]["Arn"]
     definition = (REPO_ROOT / "aws/stepfunctions/notification.asl.json").read_text()
-    for k in ("Plan", "Compose", "Send", "StoreToken"):
+    for k in ("SelectChannel", "QuietHours", "Personalize", "Send", "Engagement", "Escalation"):
         definition = definition.replace(
             f"${{{k}FunctionArn}}", f"arn:aws:lambda:us-east-1:123456789012:function:nf-{k}"
         )
     arn = sfn.create_state_machine(name="notify-flow", definition=definition, roleArn=role)[
         "stateMachineArn"
     ]
-    orch = StepFunctionsOrchestrator(sfn, arn)
-    inp = NotificationInput(
-        "evt-sfn-000001",
-        "m-1",
-        "session_missed",
-        "reengage",
-        {},
-        "2026-11-20T15:00:00+00:00",
-        "cid",
-        60,
-    )
-    first = await orch.start_notification(inp)
-    second = await orch.start_notification(inp)
-    assert first.started is True
-    assert first.workflow_id == execution_name("evt-sfn-000001")
-    # A second start with the same execution name must not create a second execution.
-    execs = sfn.list_executions(stateMachineArn=arn)["executions"]
-    assert len(execs) == 1
-    assert second.workflow_id == first.workflow_id
+    registered = sfn.describe_state_machine(stateMachineArn=arn)
+    assert registered["name"] == "notify-flow"
+    assert json.loads(registered["definition"])["StartAt"] == "SelectChannel"

@@ -47,7 +47,8 @@ def test_step_functions_definition_is_well_formed():
             assert t in states, f"{name} -> {t} missing"
         if s["Type"] == "Task":
             assert s.get("Retry"), f"{name} has no Retry"
-    # engagement wait uses a task token with a timeout that routes to escalation
-    wait = states["WaitForEngagement"]
-    assert wait["Resource"].endswith(".waitForTaskToken")
-    assert any("States.Timeout" in c["ErrorEquals"] for c in wait["Catch"])
+    # The durable wait is followed by a real engagement task and a Choice branch.
+    wait = states["WaitForEngagementWindow"]
+    assert wait["Type"] == "Wait" and wait["SecondsPath"] == "$.engagement_wait_s"
+    assert wait["Next"] == "CheckEngagement"
+    assert states["CheckEngagement"]["Next"] == "WasEngaged"

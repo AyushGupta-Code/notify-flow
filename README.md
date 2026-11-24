@@ -18,7 +18,8 @@ flowchart LR
   R -->|key = member_id| Q{{Kafka topic<br/>or SQS queue}}
   Q --> C[Ingest consumer<br/>idempotent]
   C -->|start workflow<br/>id = notify-event_id| T[Temporal<br/>or Step Functions]
-  T --> W[Worker: MemberNotificationWorkflow]
+  T --> W[Temporal worker: MemberNotificationWorkflow]
+  T --> L[AWS Lambda task handlers]
   W --> PL[plan: channel model<br/>+ rules fallback]
   W --> QH[durable timer:<br/>quiet hours]
   W --> CO[compose: LLM<br/>retry, breaker,<br/>guardrail, template fallback]
@@ -27,6 +28,7 @@ flowchart LR
   W --> E[wait for engagement signal<br/>or timeout → escalate channel]
   API -. engagement .-> T
   W & API & C & R -. /metrics .-> PR[Prometheus → alerts<br/>Grafana dashboard]
+  L -. JSON logs .-> LOG[CloudWatch-compatible log stream]
 ```
 
 ## What it demonstrates
@@ -198,8 +200,8 @@ provisioned), and a kind deploy with the same smoke test running through the clu
 | Temporal workflow (timers, signals, escalation, retries) | Verified: Temporal test server in tests; dev server locally; Temporal `auto-setup` in compose and kind (CI) |
 | Kafka adapter | Verified in CI only (test with a real broker, plus the compose and kind smoke tests). No broker on the dev machine. |
 | SQS adapter | Verified against **moto** (tests and the local stack's load test and drill). **Not run against real AWS or LocalStack.** |
-| Step Functions adapter + ASL | The definition deploys to **moto**, structural checks pass, and duplicate starts create one execution. **Moto does not execute the states**, the Lambda handlers the ASL references are not written, and it has **not run on real AWS or LocalStack.** It is a design artifact with a tested start path, not a working pipeline. |
-| LocalStack (`--profile aws`) | **Untested.** Included for convenience only. |
+| Step Functions adapter + ASL | Executable Lambda handlers, retry/catch paths, quiet-hours and engagement waits, and the LocalStack integration job are implemented. **The first LocalStack CI run is still pending, so execution is not yet verified.** Moto only verifies definition registration. Not run on real AWS. |
+| LocalStack | Deployment and real-execution tests are implemented in the `stepfunctions-localstack` CI job. **Pending the first CI run.** |
 | Ollama provider | Exercised against `scripts/fake_ollama.py` (Ollama's API shape), **not a real Ollama model.** |
 | Anthropic provider | **Untested** (no API key used). |
 | Docker images, docker-compose | Verified in CI (no Docker on the dev machine) |
@@ -212,7 +214,8 @@ provisioned), and a kind deploy with the same smoke test running through the clu
 
 - No real on-call experience: the runbook and postmortem come from a drill on a laptop.
 - No real model evaluated: the eval ran only against the mock provider.
-- Real AWS and the Step Functions path are not runnable end to end (see above).
+- Real AWS remains untested. The Step Functions LocalStack path is implemented but awaits
+  its first CI result (see above).
 - No vendor failover: if one channel's vendor is down, sends retry and then fail; they do not
   switch to another channel.
 - No per-member rate limiting or frequency caps across campaigns.
