@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notify-flow-relay
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: notify-flow-relay}
+  template:
+    metadata:
+      labels: {app: notify-flow-relay}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9101"}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 10001}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: relay
+          image: notify-flow:latest
+          command: ["python", "-m", "notify_flow.relay_main"]
+          ports: [{name: metrics, containerPort: 9101}]
+          envFrom:
+            - configMapRef: {name: notify-flow-config}
+            - secretRef: {name: notify-flow-secrets}
+          livenessProbe:
+            tcpSocket: {port: metrics}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 384Mi}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notify-flow-consumer
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: notify-flow-consumer}
+  template:
+    metadata:
+      labels: {app: notify-flow-consumer}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9101"}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 10001}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: consumer
+          image: notify-flow:latest
+          command: ["python", "-m", "notify_flow.consumer"]
+          ports: [{name: metrics, containerPort: 9101}]
+          envFrom:
+            - configMapRef: {name: notify-flow-config}
+            - secretRef: {name: notify-flow-secrets}
+          livenessProbe:
+            tcpSocket: {port: metrics}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 384Mi}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notify-flow-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: notify-flow-worker}
+  template:
+    metadata:
+      labels: {app: notify-flow-worker}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9101"}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 10001}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: worker
+          image: notify-flow:latest
+          command: ["python", "-m", "notify_flow.worker"]
+          ports: [{name: metrics, containerPort: 9101}]
+          envFrom:
+            - configMapRef: {name: notify-flow-config}
+            - secretRef: {name: notify-flow-secrets}
+          livenessProbe:
+            tcpSocket: {port: metrics}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 384Mi}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: notify-flow-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app: notify-flow-worker}

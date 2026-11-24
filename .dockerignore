@@ -1,0 +1,10 @@
+.venv
+.local-tools
+.local-data
+.git
+**/__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+drill-output
+.env

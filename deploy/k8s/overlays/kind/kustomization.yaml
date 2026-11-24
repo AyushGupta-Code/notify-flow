@@ -1,0 +1,36 @@
+# kind / CI overlay: base app + in-cluster dependencies + a dev-only secret.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: notify-flow
+resources:
+  - namespace.yaml
+  - ../../base
+  - ../../deps
+images:
+  - name: notify-flow
+    newTag: ci
+secretGenerator:
+  - name: notify-flow-secrets
+    literals:
+      # Dev-only credentials for the throwaway in-cluster Postgres. Real environments
+      # source this from a secret manager, never from the repo.
+      - NF_DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/notify_flow
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: notify-flow-config
+    behavior: merge
+    literals:
+      - NF_ENGAGEMENT_WAIT_S=5
+      - NF_QUIET_HOURS_ENABLED=false
+patches:
+  - target: {kind: Deployment, name: notify-flow-.*}
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+  - target: {kind: Job}
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent

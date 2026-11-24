@@ -1,0 +1,58 @@
+# promtool test rules deploy/prometheus/alerts_test.yml   (run in CI)
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+tests:
+  - name: llm outage -> fallback alert and circuit alert fire
+    interval: 1m
+    input_series:
+      - series: 'nf_copy_generated_total{source="template",reason="circuit_open"}'
+        values: '0+30x15'
+      - series: 'nf_copy_generated_total{source="llm",reason="ok"}'
+        values: '0+5x15'
+      - series: 'nf_llm_circuit_state{instance="worker-1"}'
+        values: '0 0 2 2 2 2 2 2 2 2 2 2 2 2 2 2'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: NotifyFlowLLMFallbackRateHigh
+        exp_alerts:
+          - exp_labels: {severity: warning, team: proactive-comms}
+            exp_annotations:
+              summary: "More than 20% of LLM-eligible messages are using fallback templates"
+              description: "Members still get messages (templates), but personalization is degraded."
+              runbook: "docs/RUNBOOK.md#llm-fallback-rate-high"
+      - eval_time: 5m
+        alertname: NotifyFlowLLMCircuitOpen
+        exp_alerts:
+          - exp_labels: {severity: warning, team: proactive-comms}
+            exp_annotations:
+              summary: "LLM circuit breaker is open on at least one worker"
+              runbook: "docs/RUNBOOK.md#llm-circuit-open"
+
+  - name: policy-only templates do not count as fallback
+    interval: 1m
+    input_series:
+      - series: 'nf_copy_generated_total{source="template",reason="policy"}'
+        values: '0+50x15'
+      - series: 'nf_copy_generated_total{source="llm",reason="ok"}'
+        values: '0+10x15'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: NotifyFlowLLMFallbackRateHigh
+        exp_alerts: []
+
+  - name: consumer lag must persist 5m before paging
+    interval: 1m
+    input_series:
+      - series: 'nf_consumer_lag_messages{partition="0"}'
+        values: '0 5000 5000 5000 0 0 5000 5000 5000 5000 5000 5000 5000'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: NotifyFlowConsumerLagHigh
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: NotifyFlowConsumerLagHigh
+        exp_alerts:
+          - exp_labels: {severity: page, team: proactive-comms}
+            exp_annotations:
+              summary: "Member-event consumer is more than 1000 messages behind"
+              runbook: "docs/RUNBOOK.md#consumer-lag-high"

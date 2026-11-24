@@ -1,0 +1,13 @@
+# Synthetic member contexts. member_values are the identifiers that must never appear.
+- {id: c01, campaign: welcome, context: {program_week: 1}, member_values: [Priya, priya@example.test]}
+- {id: c02, campaign: welcome, context: {program_week: 1}, member_values: [Marcus, "+15550111"]}
+- {id: c03, campaign: reengage, context: {program_week: 3, days_since_last_session: 4}, member_values: [Ana]}
+- {id: c04, campaign: reengage, context: {program_week: 9, days_since_last_session: 15}, member_values: [Diego]}
+- {id: c05, campaign: reengage, context: {program_week: 20, days_since_last_session: 40}, member_values: [Mei]}
+- {id: c06, campaign: reengage, context: {program_week: 2, days_since_last_session: 7}, member_values: [Olu]}
+- {id: c07, campaign: milestone, context: {session_count: 5}, member_values: [Sam]}
+- {id: c08, campaign: milestone, context: {session_count: 25}, member_values: [Fatima]}
+- {id: c09, campaign: milestone, context: {session_count: 100}, member_values: [Jordan]}
+- {id: c10, campaign: pain_checkin, context: {}, member_values: [Lee]}
+- {id: c11, campaign: reengage, context: {program_week: 52, days_since_last_session: 1}, member_values: [Alexandra]}
+- {id: c12, campaign: welcome, context: {program_week: 1}, member_values: [Noor]}

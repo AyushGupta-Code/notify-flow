@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs: {app.kubernetes.io/part-of: notify-flow}
+    includeSelectors: false
+configMapGenerator:
+  - name: notify-flow-config
+    literals:
+      - NF_QUEUE_BACKEND=kafka
+      - NF_KAFKA_BOOTSTRAP=kafka:9092
+      - NF_ORCHESTRATOR=temporal
+      - NF_TEMPORAL_ADDRESS=temporal:7233
+      - NF_LLM_PROVIDER=mock
+      - NF_LLM_MODEL=mock-copywriter-1
+      - NF_LOG_LEVEL=INFO
+resources:
+  - migrate-job.yaml
+  - api.yaml
+  - workers.yaml

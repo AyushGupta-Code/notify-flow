@@ -1,0 +1,4 @@
+# Dev/CI-only dependencies. Production would use managed services (RDS, MSK, Temporal Cloud).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: [postgres.yaml, kafka.yaml, temporal.yaml]

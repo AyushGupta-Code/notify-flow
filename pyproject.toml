@@ -60,7 +60,7 @@ ignore = ["S101", "S311", "B008"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S"]
-"scripts/**" = ["S"]
+"scripts/**" = ["S", "E501", "ASYNC"]
 "evals/**" = ["S"]
 
 [tool.mypy]

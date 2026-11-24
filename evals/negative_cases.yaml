@@ -1,0 +1,22 @@
+# Known-bad (and a few known-good) outputs. Checks the checker: each bad case must be
+# rejected with the expected failure; each good case must pass.
+- {channel: sms, expect: [pii], text: "Hi {first_name}, call 415-555-0100 to book."}
+- {channel: sms, expect: [pii], text: "Hi {first_name}, we emailed you at jo@example.com."}
+- {channel: sms, expect: [pii], text: "Hi {first_name}! Priya, your knee plan is waiting.", member_values: [Priya]}
+- {channel: push, expect: [placeholder_count], text: "Hi there, your exercises are ready."}
+- {channel: push, expect: [placeholder_count], text: "{first_name}, {first_name}, come back."}
+- {channel: sms, expect: [banned_phrase], text: "Hi {first_name}, you failed to exercise this week."}
+- {channel: sms, expect: [banned_phrase], text: "Hi {first_name}, this program will cure your back pain."}
+- {channel: sms, expect: [banned_phrase], text: "Hi {first_name}, ask about adjusting your medication."}
+- {channel: sms, expect: [banned_phrase], text: "{first_name}, last chance to keep your streak."}
+- {channel: push, expect: [tone_exclamations], text: "{first_name}, come back!! We miss you!"}
+- {channel: push, expect: [tone_shouting], text: "{first_name}, EXERCISE NOW to stay on track."}
+- {channel: sms, expect: [length], text: "Hi {first_name}, this message is much too long for a text message because it keeps going and going with details about the program, your weekly schedule, your care team, and a lot more besides."}
+- {channel: push, expect: [unfilled_variable], text: "Hi {first_name}, you have done {session_count} sessions."}
+- {channel: push, expect: [unfilled_variable], text: "Hi {first_name}, [INSERT ENCOURAGEMENT HERE]."}
+- {channel: email, expect: [missing_opt_out], text: "Hi {first_name}, your exercises are ready whenever you are."}
+- {channel: sms, expect: [empty, placeholder_count], text: ""}
+- {channel: sms, expect: [pii], text: "Hi {first_name}, your appointment on 2026-12-01 is set."}
+- {channel: sms, expect: [], text: "Hi {first_name}, a short session today still counts."}
+- {channel: push, expect: [], text: "Nice work, {first_name}. Ten sessions done."}
+- {channel: email, expect: [], text: "Hi {first_name}, your next session is ready. You can opt out of reminders in the app."}

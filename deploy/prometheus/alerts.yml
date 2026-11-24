@@ -1,0 +1,65 @@
+groups:
+  - name: notify-flow
+    rules:
+      - alert: NotifyFlowLLMFallbackRateHigh
+        expr: |
+          sum(rate(nf_copy_generated_total{source="template",reason=~"llm_error|circuit_open|guardrail"}[5m]))
+            / sum(rate(nf_copy_generated_total{reason!="policy"}[5m])) > 0.2
+        for: 5m
+        labels: {severity: warning, team: proactive-comms}
+        annotations:
+          summary: "More than 20% of LLM-eligible messages are using fallback templates"
+          description: "Members still get messages (templates), but personalization is degraded."
+          runbook: "docs/RUNBOOK.md#llm-fallback-rate-high"
+
+      - alert: NotifyFlowLLMCircuitOpen
+        expr: max(nf_llm_circuit_state) == 2
+        for: 2m
+        labels: {severity: warning, team: proactive-comms}
+        annotations:
+          summary: "LLM circuit breaker is open on at least one worker"
+          runbook: "docs/RUNBOOK.md#llm-circuit-open"
+
+      - alert: NotifyFlowConsumerLagHigh
+        expr: sum(nf_consumer_lag_messages) > 1000
+        for: 5m
+        labels: {severity: page, team: proactive-comms}
+        annotations:
+          summary: "Member-event consumer is more than 1000 messages behind"
+          runbook: "docs/RUNBOOK.md#consumer-lag-high"
+
+      - alert: NotifyFlowOutboxBacklog
+        expr: max(nf_outbox_pending) > 500
+        for: 5m
+        labels: {severity: page, team: proactive-comms}
+        annotations:
+          summary: "Accepted events are not reaching the queue (outbox backlog)"
+          runbook: "docs/RUNBOOK.md#outbox-backlog"
+
+      - alert: NotifyFlowSendFailureRateHigh
+        expr: |
+          sum(rate(nf_send_failures_total[5m]))
+            / (sum(rate(nf_notifications_sent_total[5m])) + sum(rate(nf_send_failures_total[5m]))) > 0.05
+        for: 10m
+        labels: {severity: page, team: proactive-comms}
+        annotations:
+          summary: "More than 5% of channel sends are failing"
+          runbook: "docs/RUNBOOK.md#send-failures"
+
+      - alert: NotifyFlowAPIErrorRateHigh
+        expr: |
+          sum(rate(nf_http_requests_total{status=~"5.."}[5m]))
+            / sum(rate(nf_http_requests_total[5m])) > 0.02
+        for: 5m
+        labels: {severity: page, team: proactive-comms}
+        annotations:
+          summary: "Event-ingest API 5xx ratio above 2%"
+          runbook: "docs/RUNBOOK.md#api-errors"
+
+      - alert: NotifyFlowTargetDown
+        expr: up{job="notify-flow"} == 0
+        for: 2m
+        labels: {severity: page, team: proactive-comms}
+        annotations:
+          summary: "{{ $labels.component }} is not being scraped"
+          runbook: "docs/RUNBOOK.md#target-down"

@@ -1,0 +1,12 @@
+# Each generated message is scored against every check. A message passes only if all
+# checks pass. The same checks run at request time as the guardrail (llm/guardrails.py).
+checks:
+  empty: "Message is non-empty."
+  length: "Rendered length is within the channel limit (sms 160, push 120, email 600)."
+  placeholder_count: "Uses the {first_name} placeholder exactly once (name is filled at send time)."
+  unfilled_variable: "No other unfilled {variables} or [BRACKETED] stubs."
+  banned_phrase: "No blame, pressure, outcome promises or clinical language (registry banned_phrases)."
+  tone_exclamations: "At most one exclamation mark."
+  tone_shouting: "No all-caps words of 5+ letters (STOP/HELP allowed)."
+  pii: "No email, phone, SSN, date, or the member's own name/email/phone verbatim."
+  missing_opt_out: "Email includes an opt-out sentence."
