@@ -96,9 +96,9 @@ class ChannelPolicy:
             log.warning("channel_model.load_failed", error=type(exc).__name__)
             return cls(None)
 
-    def decide(self, f: MemberFeatures) -> ChannelDecision:
+    def decide(self, f: MemberFeatures, *, use_model: bool = True) -> ChannelDecision:
         decision: ChannelDecision | None = None
-        if self.model is not None and f.eligible:
+        if use_model and self.model is not None and f.eligible:
             try:
                 scores = {c: self.model.score(f, c) for c in f.eligible}
                 if any(math.isnan(s) for s in scores.values()):

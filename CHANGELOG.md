@@ -27,3 +27,8 @@
 
 - Protected all `/v1` producer, member, engagement and admin routes with constant-time
   bearer-token validation. Health, readiness and metrics remain probe-accessible.
+
+### Channel-policy feedback
+
+- Added deterministic member-level model-vs-rules assignment and a protected experiment
+  report that aggregates sends, engagements and engagement rate by decision source.

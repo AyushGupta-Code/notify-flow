@@ -11,7 +11,7 @@ import structlog
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel
-from sqlalchemy import select, text
+from sqlalchemy import case, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -247,6 +247,33 @@ async def prompt_registry(_auth: None = Depends(require_auth)) -> dict[str, Any]
             }
             for k, c in r.campaigns.items()
         },
+    }
+
+
+@app.get("/v1/admin/channel-experiment")
+async def channel_experiment(
+    s: AsyncSession = Depends(session), _auth: None = Depends(require_auth)
+) -> dict[str, Any]:
+    rows = (
+        await s.execute(
+            select(
+                Notification.decision_source,
+                func.count(Notification.id),
+                func.sum(case((Notification.engaged_at.is_not(None), 1), else_=0)),
+            )
+            .where(Notification.step == 1, Notification.status == "sent")
+            .group_by(Notification.decision_source)
+        )
+    ).all()
+    return {
+        "variants": {
+            source: {
+                "sent": sent,
+                "engaged": engaged,
+                "engagement_rate": round(engaged / sent, 4) if sent else 0.0,
+            }
+            for source, sent, engaged in rows
+        }
     }
 
 

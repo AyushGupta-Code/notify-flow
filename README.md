@@ -215,8 +215,8 @@ provisioned), and a kind deploy with the same smoke test running through the clu
 - No real on-call experience: the runbook and postmortem come from a drill on a laptop.
 - No real model evaluated: the eval ran only against the mock provider.
 - Real AWS remains untested; the executable path is verified against LocalStack.
-- The channel model is trained on synthetic data; there is no online feedback loop or A/B
-  test of model vs rules.
+- The channel model is trained on synthetic data. The model-vs-rules experiment and live
+  engagement report are implemented, but no real member traffic has been evaluated.
 - No HIPAA controls beyond data minimization and log redaction (no encryption-at-rest
   configuration, audit log, or BAA-covered LLM provider).
 

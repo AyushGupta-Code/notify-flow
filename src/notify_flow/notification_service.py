@@ -1,5 +1,6 @@
 """Shared notification domain operations used by Temporal activities and AWS Lambda."""
 
+import hashlib
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -30,6 +31,11 @@ from notify_flow.types import (
 )
 
 log = get_logger(__name__)
+
+
+def assigned_to_model(member_id: str, percent: int) -> bool:
+    bucket = int.from_bytes(hashlib.sha256(member_id.encode()).digest()[:4], "big") % 100
+    return bucket < max(0, min(100, percent))
 
 
 def _eligible(member: Member) -> tuple[str, ...]:
@@ -100,7 +106,10 @@ class NotificationService:
             member.preferred_channel,
             eligible,
         )
-        decision = self.policy.decide(features)
+        decision = self.policy.decide(
+            features,
+            use_model=assigned_to_model(member.id, self.settings.channel_model_experiment_percent),
+        )
         context = {
             "program_week": member.program_week,
             "days_since_last_session": member.days_since_last_session,

@@ -93,3 +93,4 @@ async def test_health_ready_metrics_and_prompt_registry(client):
     reg = (await client.get("/v1/admin/prompts")).json()
     assert reg["campaigns"]["reengage"]["active_prompt"] == "reengage-v2"
     assert reg["campaigns"]["pain_checkin"]["llm_allowed"] is False
+    assert (await client.get("/v1/admin/channel-experiment")).json() == {"variants": {}}

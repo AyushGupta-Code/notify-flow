@@ -38,6 +38,11 @@ def test_missing_model_falls_back_to_rules(tmp_path):
     assert d.channel == "email" and d.escalation_channel == "push"
 
 
+def test_experiment_can_force_rules_even_when_model_is_loaded():
+    d = ChannelPolicy.from_path(MODEL).decide(feats(), use_model=False)
+    assert d.source == "rules"
+
+
 def test_corrupt_weights_fall_back_to_rules(tmp_path):
     bad = json.loads(MODEL.read_text())
     bad["channels"]["push"]["coef"] = [1.0]  # wrong length
