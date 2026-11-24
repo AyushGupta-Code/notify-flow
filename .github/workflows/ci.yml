@@ -83,8 +83,7 @@ jobs:
         ports: ["4566:4566"]
         env:
           SERVICES: lambda,stepfunctions,iam,logs,sts,events
-          HOSTNAME_FROM_LAMBDA: host.docker.internal
-          LAMBDA_DOCKER_FLAGS: --add-host host.docker.internal:host-gateway
+          HOSTNAME_FROM_LAMBDA: 172.17.0.1
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
         options: >-
@@ -106,7 +105,7 @@ jobs:
         run: |
           .venv/bin/python scripts/deploy_stepfunctions.py \
             --endpoint-url "$NF_LOCALSTACK_ENDPOINT" \
-            --database-url postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/notify_flow_test \
+            --database-url postgresql+asyncpg://postgres:postgres@172.17.0.1:5432/notify_flow_test \
             > stepfunctions-deploy.json
           echo "NF_SFN_STATE_MACHINE_ARN=$(jq -r .state_machine_arn stepfunctions-deploy.json)" >> "$GITHUB_ENV"
           cat stepfunctions-deploy.json
