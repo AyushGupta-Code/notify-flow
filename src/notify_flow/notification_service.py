@@ -17,8 +17,9 @@ from notify_flow.metrics import (
     NOTIFICATIONS_SENT,
     SEND_DUPLICATES_SUPPRESSED,
     SEND_FAILURES,
+    VENDOR_FAILOVERS,
 )
-from notify_flow.sender import ChannelProvider
+from notify_flow.sender import ChannelProvider, ProviderUnavailable
 from notify_flow.types import (
     ComposeInput,
     CopyResult,
@@ -166,27 +167,52 @@ class NotificationService:
             if row.status == "sent":
                 SEND_DUPLICATES_SUPPRESSED.inc()
                 log.info("send.duplicate_suppressed", key=key)
-                return SendResult(row.id, "duplicate", row.provider_message_id)
+                return SendResult(row.id, "duplicate", row.provider_message_id, row.channel)
             member = await session.get(Member, notification.member_id)
             if member is None:
                 raise RuntimeError("member disappeared")
             body = row.body_template.replace("{first_name}", member.first_name)
+            delivered_channel = inp.channel
             try:
                 message_id = await self.provider.send(
                     idempotency_key=key,
-                    channel=inp.channel,
+                    channel=delivered_channel,
                     member_id=notification.member_id,
                     body=body,
                 )
+            except ProviderUnavailable:
+                fallback = plan.escalation_channel if inp.step == 1 else None
+                if not fallback or fallback == inp.channel:
+                    SEND_FAILURES.labels(inp.channel).inc()
+                    raise
+                VENDOR_FAILOVERS.labels(inp.channel, fallback).inc()
+                log.warning(
+                    "send.vendor_failover",
+                    key=key,
+                    from_channel=inp.channel,
+                    to_channel=fallback,
+                )
+                delivered_channel = fallback
+                try:
+                    message_id = await self.provider.send(
+                        idempotency_key=key,
+                        channel=delivered_channel,
+                        member_id=notification.member_id,
+                        body=body,
+                    )
+                except Exception:
+                    SEND_FAILURES.labels(delivered_channel).inc()
+                    raise
             except Exception:
                 SEND_FAILURES.labels(inp.channel).inc()
                 raise
+            row.channel = delivered_channel
             row.status = "sent"
             row.provider_message_id = message_id
             row.sent_at = datetime.now(UTC)
-        NOTIFICATIONS_SENT.labels(inp.channel, str(inp.step), copy.source).inc()
+        NOTIFICATIONS_SENT.labels(delivered_channel, str(inp.step), copy.source).inc()
         if inp.step == 1:
             occurred = datetime.fromisoformat(notification.occurred_at)
             END_TO_END_LATENCY.observe(max(0.0, (datetime.now(UTC) - occurred).total_seconds()))
-        log.info("send.sent", key=key, channel=inp.channel, copy_source=copy.source)
-        return SendResult(row.id, "sent", message_id)
+        log.info("send.sent", key=key, channel=delivered_channel, copy_source=copy.source)
+        return SendResult(row.id, "sent", message_id, delivered_channel)

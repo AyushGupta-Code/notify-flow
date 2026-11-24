@@ -155,6 +155,20 @@ async def test_crash_after_vendor_accepts_does_not_double_send(env, sm, make_wor
     assert await deliveries(sm, "m-001") == 2  # not 3
 
 
+async def test_definitive_vendor_outage_fails_over_without_later_duplicate_escalation(
+    env, sm, make_worker
+):
+    await add_member(sm)
+    w, acts = make_worker()
+    acts.provider.unavailable_channels.add("push")
+    async with w:
+        _, result = await run_event(env, sm, msg())
+    assert result["sends"] == ["sent"]
+    (row,) = await notifications(sm, "m-001")
+    assert row.channel == "sms"
+    assert await deliveries(sm, "m-001") == 1
+
+
 async def test_llm_outage_degrades_to_templates(env, sm, make_worker):
     await add_member(sm)
     w, acts = make_worker()

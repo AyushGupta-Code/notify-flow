@@ -104,7 +104,12 @@ class MemberNotificationWorkflow:
             pass
 
         sends = [first.status]
-        if not self._engaged and plan.escalation_channel and inp.campaign != "pain_checkin":
+        if (
+            not self._engaged
+            and plan.escalation_channel
+            and plan.escalation_channel != first.channel
+            and inp.campaign != "pain_checkin"
+        ):
             await self._wait_for_quiet_hours(plan)
             second = await self._compose_and_send(inp, plan, plan.escalation_channel, 2)
             sends.append(second.status)

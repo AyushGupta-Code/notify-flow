@@ -59,6 +59,7 @@
       "Choices": [
         {"Variable": "$.plan.escalation_channel", "IsPresent": false, "Next": "Completed"},
         {"Variable": "$.plan.escalation_channel", "IsNull": true, "Next": "Completed"},
+        {"Variable": "$.plan.escalation_channel", "StringEqualsPath": "$.last_send.channel", "Next": "Completed"},
         {"Variable": "$.campaign", "StringEquals": "pain_checkin", "Next": "Completed"}
       ],
       "Default": "PrepareEscalation"

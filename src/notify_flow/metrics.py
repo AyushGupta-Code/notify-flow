@@ -23,6 +23,11 @@ SEND_DUPLICATES_SUPPRESSED = Counter(
     "nf_send_duplicates_suppressed_total", "Send attempts skipped because the key was already sent"
 )
 SEND_FAILURES = Counter("nf_send_failures_total", "Channel provider send failures", ["channel"])
+VENDOR_FAILOVERS = Counter(
+    "nf_vendor_failovers_total",
+    "Definitive pre-send provider failures routed to a fallback channel",
+    ["from_channel", "to_channel"],
+)
 CHANNEL_DECISIONS = Counter(
     "nf_channel_decisions_total", "Channel decisions", ["source", "model_version", "channel"]
 )

@@ -26,6 +26,10 @@ def test_definition_has_quiet_wait_and_engagement_choice():
         "BooleanEquals": True,
         "Next": "Completed",
     }
+    assert any(
+        choice.get("StringEqualsPath") == "$.last_send.channel"
+        for choice in states["CanEscalate"]["Choices"]
+    )
 
 
 def test_definition_references_all_lambda_handlers():

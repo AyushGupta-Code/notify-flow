@@ -64,3 +64,4 @@ class SendResult:
     notification_id: int
     status: str  # "sent" | "duplicate"
     provider_message_id: str | None
+    channel: str = ""

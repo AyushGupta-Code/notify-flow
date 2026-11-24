@@ -200,8 +200,8 @@ provisioned), and a kind deploy with the same smoke test running through the clu
 | Temporal workflow (timers, signals, escalation, retries) | Verified: Temporal test server in tests; dev server locally; Temporal `auto-setup` in compose and kind (CI) |
 | Kafka adapter | Verified in CI only (test with a real broker, plus the compose and kind smoke tests). No broker on the dev machine. |
 | SQS adapter | Verified against **moto** (tests and the local stack's load test and drill). **Not run against real AWS or LocalStack.** |
-| Step Functions adapter + ASL | Executable Lambda handlers, retry/catch paths, quiet-hours and engagement waits, and the LocalStack integration job are implemented. **The first LocalStack CI run is still pending, so execution is not yet verified.** Moto only verifies definition registration. Not run on real AWS. |
-| LocalStack | Deployment and real-execution tests are implemented in the `stepfunctions-localstack` CI job. **Pending the first CI run.** |
+| Step Functions adapter + ASL | Verified in LocalStack CI: six Lambda handlers, retry/catch paths, duplicate starts, quiet-hours and engagement waits, fallback copy, and idempotent sends. Moto also verifies definition registration. Not run on real AWS. |
+| LocalStack | Deployment plus real Step Functions and Lambda executions are verified in the `stepfunctions-localstack` CI job. |
 | Ollama provider | Exercised against `scripts/fake_ollama.py` (Ollama's API shape), **not a real Ollama model.** |
 | Anthropic provider | **Untested** (no API key used). |
 | Docker images, docker-compose | Verified in CI (no Docker on the dev machine) |
@@ -214,10 +214,7 @@ provisioned), and a kind deploy with the same smoke test running through the clu
 
 - No real on-call experience: the runbook and postmortem come from a drill on a laptop.
 - No real model evaluated: the eval ran only against the mock provider.
-- Real AWS remains untested. The Step Functions LocalStack path is implemented but awaits
-  its first CI result (see above).
-- No vendor failover: if one channel's vendor is down, sends retry and then fail; they do not
-  switch to another channel.
+- Real AWS remains untested; the executable path is verified against LocalStack.
 - No per-member rate limiting or frequency caps across campaigns.
 - No auth on the API (admin endpoints included). It would sit behind a gateway or mTLS in a
   real deployment.
