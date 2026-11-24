@@ -13,6 +13,7 @@ x-app: &app
     NF_LLM_BASE_URL: ${NF_LLM_BASE_URL:-http://host.docker.internal:11434}
     NF_ENGAGEMENT_WAIT_S: ${NF_ENGAGEMENT_WAIT_S:-172800}
     NF_QUIET_HOURS_ENABLED: ${NF_QUIET_HOURS_ENABLED:-true}
+    NF_API_BEARER_TOKEN: ${NF_API_BEARER_TOKEN:-local-dev-token}
   depends_on:
     migrate: {condition: service_completed_successfully}
 

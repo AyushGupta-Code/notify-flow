@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from notify_flow.api.app import app
+from notify_flow.config import get_settings
 from notify_flow.db.models import InboundEvent, Outbox
 from notify_flow.relay import OutboxRelay
 
@@ -28,10 +29,13 @@ class MemoryPublisher:
 
 @pytest.fixture
 async def client(sm):
+    get_settings().api_bearer_token = "test-token"
     app.state.sm = sm
     app.state.orchestrator = None
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://test"
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+        headers={"Authorization": "Bearer test-token"},
     ) as c:
         yield c
 
@@ -58,6 +62,16 @@ async def test_duplicate_event_is_accepted_once(client, sm):
 async def test_invalid_event_rejected(client):
     r = await client.post("/v1/events", json={**EVENT, "event_type": "nope"})
     assert r.status_code == 422
+
+
+async def test_v1_routes_require_bearer_auth(client):
+    assert (
+        await client.post("/v1/events", json=EVENT, headers={"Authorization": ""})
+    ).status_code == 401
+    assert (
+        await client.get("/v1/admin/prompts", headers={"Authorization": "Bearer wrong"})
+    ).status_code == 401
+    assert (await client.get("/healthz", headers={"Authorization": ""})).status_code == 200
 
 
 async def test_outbox_relay_publishes_once_with_correlation_header(client, sm):

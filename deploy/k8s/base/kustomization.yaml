@@ -13,6 +13,7 @@ configMapGenerator:
       - NF_LLM_PROVIDER=mock
       - NF_LLM_MODEL=mock-copywriter-1
       - NF_LOG_LEVEL=INFO
+      - NF_API_BEARER_TOKEN=local-dev-token
 resources:
   - migrate-job.yaml
   - api.yaml

@@ -22,3 +22,8 @@
 - Added atomic, durable rolling-24-hour reservations across campaigns. The default admits
   ten distinct notification events per member; duplicate planning is idempotent and
   concurrent workflows serialize on the member row.
+
+### API authentication
+
+- Protected all `/v1` producer, member, engagement and admin routes with constant-time
+  bearer-token validation. Health, readiness and metrics remain probe-accessible.

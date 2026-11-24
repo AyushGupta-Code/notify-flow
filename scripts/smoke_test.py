@@ -7,6 +7,7 @@ notification(s) to be sent. Exits non-zero on failure.
 """
 
 import argparse
+import os
 import sys
 import time
 import uuid
@@ -18,13 +19,14 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", default="http://localhost:8000")
     ap.add_argument("--timeout", type=float, default=180)
+    ap.add_argument("--token", default=os.getenv("NF_API_BEARER_TOKEN", "local-dev-token"))
     ap.add_argument(
         "--expect-escalation",
         action="store_true",
         help="stack runs with a short NF_ENGAGEMENT_WAIT_S, expect step 2",
     )
     a = ap.parse_args()
-    c = httpx.Client(base_url=a.api, timeout=10)
+    c = httpx.Client(base_url=a.api, timeout=10, headers={"Authorization": f"Bearer {a.token}"})
     deadline = time.time() + a.timeout
     while True:
         try:

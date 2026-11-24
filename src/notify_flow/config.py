@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     quiet_hours_end: int = 8  # local hour, exclusive
     quiet_hours_enabled: bool = True
     member_frequency_cap_24h: int = 10  # distinct notification events; 0 disables
+    api_bearer_token: str = ""  # required for /v1 routes; inject from a secret
 
     metrics_port: int = 9101
 

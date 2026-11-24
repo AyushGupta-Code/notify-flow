@@ -1,5 +1,6 @@
 """Event-ingest and admin API. Run: uvicorn notify_flow.api.app:app"""
 
+import secrets
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -7,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel
 from sqlalchemy import select, text
@@ -78,6 +79,13 @@ async def session(request: Request) -> AsyncIterator[AsyncSession]:
         yield s
 
 
+async def require_auth(authorization: str | None = Header(default=None)) -> None:
+    expected = get_settings().api_bearer_token
+    supplied = authorization.removeprefix("Bearer ") if authorization else ""
+    if not expected or not secrets.compare_digest(supplied, expected):
+        raise HTTPException(401, "invalid bearer token", headers={"WWW-Authenticate": "Bearer"})
+
+
 class EventAccepted(BaseModel):
     event_id: str
     status: str  # "accepted" | "duplicate"
@@ -86,7 +94,10 @@ class EventAccepted(BaseModel):
 
 @app.post("/v1/events", status_code=202, response_model=EventAccepted)
 async def ingest_event(
-    event: MemberEvent, response: Response, s: AsyncSession = Depends(session)
+    event: MemberEvent,
+    response: Response,
+    s: AsyncSession = Depends(session),
+    _auth: None = Depends(require_auth),
 ) -> EventAccepted:
     cid = correlation_id.get() or new_correlation_id()
     settings = get_settings()
@@ -142,7 +153,12 @@ class MemberIn(BaseModel):
 
 
 @app.put("/v1/admin/members/{member_id}", status_code=204)
-async def upsert_member(member_id: str, m: MemberIn, s: AsyncSession = Depends(session)) -> None:
+async def upsert_member(
+    member_id: str,
+    m: MemberIn,
+    s: AsyncSession = Depends(session),
+    _auth: None = Depends(require_auth),
+) -> None:
     if m.id != member_id:
         raise HTTPException(400, "id mismatch")
     values = m.model_dump()
@@ -158,7 +174,9 @@ async def upsert_member(member_id: str, m: MemberIn, s: AsyncSession = Depends(s
 
 @app.get("/v1/members/{member_id}/notifications")
 async def list_notifications(
-    member_id: str, s: AsyncSession = Depends(session)
+    member_id: str,
+    s: AsyncSession = Depends(session),
+    _auth: None = Depends(require_auth),
 ) -> list[dict[str, Any]]:
     rows = (
         (
@@ -194,7 +212,10 @@ async def list_notifications(
 
 @app.post("/v1/notifications/{notification_id}/engagement", status_code=202)
 async def record_engagement(
-    notification_id: int, request: Request, s: AsyncSession = Depends(session)
+    notification_id: int,
+    request: Request,
+    s: AsyncSession = Depends(session),
+    _auth: None = Depends(require_auth),
 ) -> dict[str, str]:
     async with s.begin():
         n = await s.get(Notification, notification_id, with_for_update=True)
@@ -213,7 +234,7 @@ async def record_engagement(
 
 
 @app.get("/v1/admin/prompts")
-async def prompt_registry() -> dict[str, Any]:
+async def prompt_registry(_auth: None = Depends(require_auth)) -> dict[str, Any]:
     r = load_registry(get_settings().prompt_registry_path)
     return {
         "registry_version": r.registry_version,
