@@ -2,10 +2,11 @@ import json
 
 import httpx
 import pytest
+from sqlalchemy import select
 
 from notify_flow.api.app import app
 from notify_flow.config import get_settings
-from notify_flow.db.models import InboundEvent, Outbox
+from notify_flow.db.models import AuditEvent, InboundEvent, Outbox
 from notify_flow.relay import OutboxRelay
 
 from .helpers import count
@@ -72,6 +73,19 @@ async def test_v1_routes_require_bearer_auth(client):
         await client.get("/v1/admin/prompts", headers={"Authorization": "Bearer wrong"})
     ).status_code == 401
     assert (await client.get("/healthz", headers={"Authorization": ""})).status_code == 200
+
+
+async def test_protected_requests_are_audited_without_raw_token(client, sm):
+    response = await client.get("/v1/admin/prompts", headers={"x-correlation-id": "audit-cid"})
+    assert response.headers["cache-control"] == "no-store"
+    async with sm() as session:
+        event = (
+            await session.execute(
+                select(AuditEvent).where(AuditEvent.correlation_id == "audit-cid")
+            )
+        ).scalar_one()
+    assert event.route == "/v1/admin/prompts" and event.status == 200
+    assert event.actor_hash != "test-token" and len(event.actor_hash) == 64
 
 
 async def test_outbox_relay_publishes_once_with_correlation_header(client, sm):

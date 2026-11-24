@@ -217,8 +217,8 @@ provisioned), and a kind deploy with the same smoke test running through the clu
 - Real AWS remains untested; the executable path is verified against LocalStack.
 - The channel model is trained on synthetic data. The model-vs-rules experiment and live
   engagement report are implemented, but no real member traffic has been evaluated.
-- No HIPAA controls beyond data minimization and log redaction (no encryption-at-rest
-  configuration, audit log, or BAA-covered LLM provider).
+- The app now has data minimization, log redaction, API authentication and an append-only access
+  audit trail. Deployment-level encryption-at-rest and a BAA-covered LLM provider remain untested.
 
 ## Layout
 

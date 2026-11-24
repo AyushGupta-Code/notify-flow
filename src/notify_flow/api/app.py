@@ -1,5 +1,6 @@
 """Event-ingest and admin API. Run: uvicorn notify_flow.api.app:app"""
 
+import hashlib
 import secrets
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -16,7 +17,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from notify_flow.config import get_settings
-from notify_flow.db.models import InboundEvent, Member, Notification, Outbox
+from notify_flow.db.models import AuditEvent, InboundEvent, Member, Notification, Outbox
 from notify_flow.db.session import make_engine, make_sessionmaker
 from notify_flow.events import MemberEvent
 from notify_flow.llm.registry import load_registry
@@ -42,6 +43,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="notify-flow", version="0.1.0", lifespan=lifespan)
 
 
+async def _write_audit(request: Request, status: int, cid: str) -> None:
+    if not request.url.path.startswith("/v1/") or not hasattr(request.app.state, "sm"):
+        return
+    token = request.headers.get("authorization", "").removeprefix("Bearer ")
+    actor_hash = hashlib.sha256(token.encode()).hexdigest()
+    route = request.scope.get("route")
+    path = getattr(route, "path", request.url.path)
+    sm: async_sessionmaker[AsyncSession] = request.app.state.sm
+    try:
+        async with sm.begin() as audit_session:
+            audit_session.add(
+                AuditEvent(
+                    actor_hash=actor_hash,
+                    method=request.method,
+                    route=path,
+                    status=status,
+                    correlation_id=cid,
+                )
+            )
+    except Exception as exc:
+        log.error("audit.write_failed", error=type(exc).__name__)
+
+
 @app.middleware("http")
 async def correlation_and_access_log(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
@@ -55,6 +79,10 @@ async def correlation_and_access_log(
         response = await call_next(request)
         status = response.status_code
         response.headers["x-correlation-id"] = cid
+        response.headers["x-content-type-options"] = "nosniff"
+        if request.url.path.startswith("/v1/"):
+            response.headers["cache-control"] = "no-store"
+        await _write_audit(request, status, cid)
         return response
     finally:
         route = request.scope.get("route")

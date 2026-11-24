@@ -107,6 +107,22 @@ class NotificationReservation(Base):
     )
 
 
+class AuditEvent(Base):
+    """Append-only security audit event; bearer tokens are stored only as SHA-256 hashes."""
+
+    __tablename__ = "audit_events"
+
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
+    actor_hash: Mapped[str] = mapped_column(String(64))
+    method: Mapped[str] = mapped_column(String(16))
+    route: Mapped[str] = mapped_column(String(200), index=True)
+    status: Mapped[int] = mapped_column(Integer)
+    correlation_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
 class Notification(Base):
     """One row per (event, step). idempotency_key is unique, which is what makes a send
     happen at most once no matter how many times the activity runs."""

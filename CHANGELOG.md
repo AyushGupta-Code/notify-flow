@@ -32,3 +32,9 @@
 
 - Added deterministic member-level model-vs-rules assignment and a protected experiment
   report that aggregates sends, engagements and engagement rate by decision source.
+
+### Security audit trail
+
+- Added append-only audit records for every protected API attempt, storing only a bearer-token
+  hash plus route, method, status and correlation ID. Protected responses are non-cacheable and
+  carry MIME-sniffing protection.
